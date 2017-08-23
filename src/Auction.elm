@@ -3,21 +3,11 @@ module Auction exposing (..)
 import Json.Decode as Decode exposing (Decoder, map, map2, string, int, list, field)
 import Http exposing (Error, Request, send, get)
 import Regex exposing (Regex, regex)
+import Task exposing (Task)
 
-type TimeLeft =
-    Short
-    | Medium
-    | Long
-    | VeryLong
-
-type alias AuctionResponse =
-    { realms : List Realm
-    , auctions : List Auction
-    }
-
-type alias Realm =
-    { name : String
-    , slug : String
+type alias AuctionFile =
+    { url : String
+    , lastModified : Int
     }
 
 type alias Auction =
@@ -30,50 +20,63 @@ type alias Auction =
     , timeLeft : String
     }
 
-fetchAuctions : String -> (Result Http.Error AuctionResponse -> msg) -> Cmd msg
-fetchAuctions url msg =
-    case (auctionsRequest url) of
-        Ok request ->
-            send msg request
-        Err error ->
-            Cmd.none
+type TimeLeft =
+    Short
+    | Medium
+    | Long
+    | VeryLong
 
-auctionsRequest : String -> Result String (Request AuctionResponse)
-auctionsRequest url =
-    case getPath <| auctionDumpFilePath url of
-        Ok path ->
-            Ok (get ("http://localhost:8085" ++ path) auctionResponseDecoder)
-        Err error ->
-            Err error
+type alias Realm =
+    { name : String
+    , slug : String
+    }
 
-getPath : List Regex.Match -> Result String String
-getPath matches =
-    case List.head matches of
-        Just {submatches} ->
-            case List.head submatches of
-                Just path ->
-                    Ok path
-                Nothing ->
-                    Err "Path found in matches"
-        Nothing ->
-            Err "No matches"
+type alias AuctionFileResponse =
+    { files : AuctionFile
+    }
 
+type alias AuctionResponse =
+    { realms : List Realm
+    , auctions : List Auction
+    }
 
+fetchAuctions : (Result Http.Error AuctionResponse -> msg) -> Cmd msg
+fetchAuctions msg =
+    Http.toTask auctionFilesRequest
+    |> Task.andThen (auctionsRequest >> Http.toTask)
+    |> Task.attempt msg
 
-auctionDumpFilePath : String -> List Regex.Match
-auctionDumpFilePath url=
-    Regex.find (Regex.AtMost 1) (regex "/worldofwarcraft\\.com(.*)/") url
+auctionFilesRequest : Request AuctionFileResponse
+auctionFilesRequest =
+    get
+        "https://us.api.battle.net/wow/auction/data/medivh?locale=en_US&apikey=xe68j3g8txkukntygqduvrbm4vjqcxg6"
+        auctionFilesDecoder
+
+auctionsRequest : AuctionFileResponse -> Request AuctionResponse
+auctionsRequest auctionFileResponse =
+    get ("http://localhost:8085?url=" ++ auctionFileResponse.files.url) auctionResponseDecoder
+
+-- Decoders
+auctionFilesDecoder : Decoder AuctionFileResponse
+auctionFilesDecoder =
+    map AuctionFileResponse
+        (field "files" (Decode.index 0 auctionFileDecoder))
+
+auctionFileDecoder : Decoder AuctionFile
+auctionFileDecoder =
+    map2 AuctionFile
+        (field "url" string)
+        (field "lastModified" int)
 
 auctionResponseDecoder : Decoder AuctionResponse
 auctionResponseDecoder =
-    Decode.map2 AuctionResponse
+    map2 AuctionResponse
         (field "realms" (list realmDecoder))
         (field "auctions" (list auctionDecoder))
 
-
 realmDecoder : Decoder Realm
 realmDecoder =
-    Decode.map2 Realm
+    map2 Realm
         (field "name" string)
         (field "slug" string)
 

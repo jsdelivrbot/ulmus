@@ -3,8 +3,7 @@ module Main exposing (..)
 import Html exposing (Html, text, div, button, p, input, label)
 import Html.Events exposing (onInput, onClick)
 import Html.Attributes exposing (class)
-import AuctionFile exposing (AuctionFileResponse, AuctionFile, fetchAuctionFiles)
-import Auction exposing (AuctionResponse, Auction, fetchAuctions)
+import Auction exposing (AuctionResponse, Auction, AuctionFile, fetchAuctions)
 import Http
 
 type alias Model =
@@ -14,8 +13,7 @@ type alias Model =
     }
 
 type Msg =
-    FetchAuctionDumpFiles (Result Http.Error AuctionFileResponse)
-    | FetchAuctions (Result Http.Error AuctionResponse)
+    FetchAuctions (Result Http.Error AuctionResponse)
     | NoOp
 
 initialModel : Model
@@ -24,25 +22,25 @@ initialModel =
 
 init : (Model, Cmd Msg)
 init =
-    (initialModel, fetchAuctionFiles FetchAuctionDumpFiles)
+    (initialModel, fetchAuctions FetchAuctions)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        FetchAuctionDumpFiles (Ok auctionFileResponse) ->
-            case (List.head auctionFileResponse.files) of
-                Just auctionFile ->
-                    ({ model | auctionFile = auctionFile }, fetchAuctions auctionFile.url FetchAuctions)
-                Nothing ->
-                    (model, Cmd.none)
-        FetchAuctionDumpFiles (Err error) ->
-            ({ model | httpError = handleHttpError error }, Cmd.none)
+        FetchAuctions (Ok response) ->
+            Debug.log "Good to go" |> always ({model | auctions = response.auctions}, Cmd.none)
+        FetchAuctions (Err error) ->
+            Debug.log "Error" error |> always (model, Cmd.none)
         _ ->
             (model, Cmd.none)
 
 handleHttpError : Http.Error -> String
 handleHttpError err =
     case err of
+        Http.BadUrl str ->
+            "There was a bad url given"
+        Http.BadStatus resp ->
+            resp.status.message
         _ ->
             "Something went wrong"
 
@@ -50,7 +48,8 @@ handleHttpError err =
 view : Model -> Html Msg
 view model =
     div []
-        [ (text model.auctionFile.url)
+        [ p [] [ text "Currently loading auction" ]
+        , (text model.auctionFile.url)
         , text model.httpError
         ]
 

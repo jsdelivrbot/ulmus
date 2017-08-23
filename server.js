@@ -1,28 +1,28 @@
 const express = require('express');
 const http = require('http');
+const websocket = require('websocket');
 
-const app = express();
-
+const ws = websocket.Server({ port: 8085 });
 const host = 'http://auction-api-us.worldofwarcraft.com';
 
-app.use((req, res) => {
-    const fullUrl = host + req.path;
+ws.on('connection', connection);
 
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+function connection(ws) {
+    ws.on('message', incoming.bind(this, ws));
+}
 
+function incoming(ws, message) {
+    if(message.match(/auction/i)) {
+        fetchAuctions(message, (chunk) => {
+            ws.send(chunk);
+        }, () => {
 
-    http.request(fullUrl, auctionRes => {
-        // let data = '';
-        auctionRes.on('data', chunk => {
-            // data += chunk;
-            res.write(chunk);
         });
+    }
+}
 
-        auctionRes.on('end', () => {
-            // res.send(data);
-        });
-    }).end();
-});
-
-app.listen(8085);
+function fetchAuctions(path, onData, onEnd) {
+    return http.get(host + path)
+        .on('data', onData)
+        .on('end', onEnd);
+}
