@@ -1,46 +1,79 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div, button, p, input, label)
-import Html.Events exposing (onInput, onClick)
-import Html.Attributes exposing (class)
-import Http
+import Html exposing (Html, text, div)
+import Navigation exposing (Location)
 
-import Pokemon exposing (Pokemon, PokemonSprite, fetchPokemon, pokemonView)
+type Page =
+    Home
+    | About
+    | Contact
 
 type alias Model =
     { helloWorld: String
+    , page : Page
     }
 
 type Msg =
+    UrlChange Location
     | NoOp
 
-initialModel : Model
-initialModel =
-    Model "Hello World"
+initialModel : Page -> Model
+initialModel initialPage =
+    Model "Hello World" initialPage
 
-init : (Model, Cmd Msg)
-init =
-    (initialModel, Cmd.none)
+init : Location -> (Model, Cmd Msg)
+init location =
+    (getPage location.hash |> initialModel, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        UrlChange location ->
+            { model | page = (getPage location.hash)} ! [ Cmd.none ]
         _ ->
             (model, Cmd.none)
 
 
+getPage : String -> Page
+getPage hash =
+    case hash of
+        "#/about" ->
+            About
+        "#/contact" ->
+            Contact
+        _ ->
+            Home
+
+renderPages : Model -> Html Msg
+renderPages model =
+    case model.page of
+        About ->
+            about model
+        _ ->
+            home model
+
+
+home : Model -> Html Msg
+home model =
+    div [] [ text "home" ]
+
+about : Model -> Html Msg
+about model =
+    div [] [ text "about" ]
+
 view : Model -> Html Msg
 view model =
     div []
-        [ text model.helloWorld
+        [ renderPages model
         ]
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
 
+main : Program Never Model Msg
 main =
-    Html.program
+    Navigation.program UrlChange
         { init = init
         , update = update
         , view = view
