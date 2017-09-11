@@ -1,70 +1,31 @@
 module Main exposing (..)
 
 import Html exposing (Html, text, div)
+import Model exposing (Model, Msg(..))
+import Page exposing (Page, getPageFromUrl)
 import Navigation exposing (Location)
 
-type Page =
-    Home
-    | About
-    | Contact
-
-type alias Model =
-    { helloWorld: String
-    , page : Page
-    }
-
-type Msg =
-    UrlChange Location
-    | NoOp
-
-initialModel : Page -> Model
-initialModel initialPage =
-    Model "Hello World" initialPage
+initialModel : String -> Model
+initialModel path =
+    Model "Hello World" path
 
 init : Location -> (Model, Cmd Msg)
 init location =
-    (getPage location.hash |> initialModel, Cmd.none)
+    (initialModel location.hash, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         UrlChange location ->
-            { model | page = (getPage location.hash)} ! [ Cmd.none ]
+            { model | path = location.hash } ! [ Cmd.none ]
         _ ->
             (model, Cmd.none)
 
 
-getPage : String -> Page
-getPage hash =
-    case hash of
-        "#/about" ->
-            About
-        "#/contact" ->
-            Contact
-        _ ->
-            Home
-
-renderPages : Model -> Html Msg
-renderPages model =
-    case model.page of
-        About ->
-            about model
-        _ ->
-            home model
-
-
-home : Model -> Html Msg
-home model =
-    div [] [ text "home" ]
-
-about : Model -> Html Msg
-about model =
-    div [] [ text "about" ]
-
 view : Model -> Html Msg
 view model =
     div []
-        [ renderPages model
+        [ getPageFromUrl model.path model
         ]
 
 subscriptions : Model -> Sub Msg
